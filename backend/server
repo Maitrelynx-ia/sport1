@@ -1,0 +1,106 @@
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const admin = require('firebase-admin');
+const serviceAccount = require('./firebase/serviceAccountKey.json');
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: process.env.FIREBASE_DATABASE_URL
+});
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+// Middleware to verify Firebase token
+const verifyToken = async (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).send('Unauthorized');
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    req.user = decodedToken;
+    next();
+  } catch (error) {
+    res.status(401).send('Unauthorized');
+  }
+};
+
+// Route to create a session
+app.post('/api/sessions', verifyToken, async (req, res) => {
+  try {
+    const { title, sport, duration, isPublic, isPaid, price, isRestricted, allowedUsers } = req.body;
+    const db = admin.firestore();
+    const sessionRef = await db.collection('sessions').add({
+      title,
+      sport,
+      duration,
+      isPublic,
+      isPaid,
+      price: isPaid ? price : 0,
+      isRestricted,
+      allowedUsers: isRestricted ? allowedUsers : [],
+      coachId: req.user.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.status(201).send({ id: sessionRef.id });
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+// Route to get a specific session
+app.get('/api/sessions/:id', async (req, res) => {
+  try {
+    const db = admin.firestore();
+    const doc = await db.collection('sessions').doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).send('Session not found');
+    res.status(200).send({ id: doc.id, ...doc.data() });
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+// Route to get user's sessions (as coach)
+app.get('/api/my-sessions', verifyToken, async (req, res) => {
+  try {
+    const db = admin.firestore();
+    const snapshot = await db.collection('sessions').where('coachId', '==', req.user.uid).get();
+    const sessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.status(200).send(sessions);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+// Route to save workout
+app.post('/api/workouts', verifyToken, async (req, res) => {
+  try {
+    const { sessionId, metrics } = req.body;
+    const db = admin.firestore();
+    await db.collection('workouts').add({
+      sessionId,
+      userId: req.user.uid,
+      metrics,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.status(201).send('Workout saved');
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+// Route to get user's workouts
+app.get('/api/workouts', verifyToken, async (req, res) => {
+  try {
+    const db = admin.firestore();
+    const snapshot = await db.collection('workouts').where('userId', '==', req.user.uid).get();
+    const workouts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.status(200).send(workouts);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

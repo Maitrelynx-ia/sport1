@@ -1,0 +1,52 @@
+.App {
+  font-family: Arial, sans-serif;
+}
+
+.App-header {
+  background-color: #282c34;
+  color: white;
+  padding: 20px;
+  text-align: center;
+}
+
+.App-header nav {
+  margin-top: 10px;
+}
+
+.App-header nav a {
+  color: white;
+  margin: 0 10px;
+  text-decoration: none;
+}
+
+.App-header nav a:hover {
+  text-decoration: underline;
+}
+
+main {
+  padding: 20px;
+}
+
+button {
+  background-color: #61dafb;
+  border: none;
+  padding: 10px 20px;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+button:hover {
+  background-color: #21b4d6;
+}
+
+input, select {
+  padding: 8px;
+  margin: 5px 0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+label {
+  display: block;
+  margin-bottom: 5px;
+}
